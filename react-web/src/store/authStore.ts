@@ -9,6 +9,20 @@ export interface User {
   is_admin?: boolean
 }
 
+function normalizeUser(raw: unknown): User | null {
+  if (!raw || typeof raw !== 'object') return null
+  const data = 'user' in raw && raw.user && typeof raw.user === 'object'
+    ? (raw.user as Record<string, unknown>)
+    : (raw as Record<string, unknown>)
+  if (!data.id || !data.email) return null
+  return {
+    id: Number(data.id),
+    name: String(data.name ?? ''),
+    email: String(data.email),
+    is_admin: data.is_admin === true || data.is_admin === 1 || data.is_admin === 'true',
+  }
+}
+
 interface AuthState {
   user: User | null
   token: string | null
@@ -31,8 +45,9 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true })
         try {
           const res = await authApi.login(email, password)
+          const user = normalizeUser(res)
           set({
-            user: res.user,
+            user,
             token: res.token,
             isAuthenticated: true,
             isLoading: false,
@@ -48,8 +63,9 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true })
         try {
           const res = await authApi.register(data)
+          const user = normalizeUser(res)
           set({
-            user: res.user,
+            user,
             token: res.token,
             isAuthenticated: true,
             isLoading: false,
@@ -76,8 +92,8 @@ export const useAuthStore = create<AuthState>()(
           return
         }
         try {
-          const user = await authApi.me()
-          set({ user: user.user ?? user, token, isAuthenticated: true })
+          const raw = await authApi.me()
+          set({ user: normalizeUser(raw), token, isAuthenticated: true })
         } catch {
           set({ user: null, token: null, isAuthenticated: false })
           localStorage.removeItem('token')

@@ -8,6 +8,7 @@ import { initDatabase } from './db/init.js'
 import authRoutes from './routes/auth.js'
 import ebookRoutes from './routes/ebooks.js'
 import adminRoutes from './routes/admin.js'
+import setupRoutes from './routes/setup.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -23,9 +24,24 @@ app.use(express.urlencoded({ extended: true }))
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'ebook-api' })
+app.get('/api/health', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT email FROM users WHERE is_admin = TRUE ORDER BY id'
+    )
+    res.json({
+      status: 'ok',
+      service: 'ebook-api',
+      adminEmailConfigured: config.admin.email,
+      adminsInDatabase: rows.map((r) => r.email),
+      hasAdmin: rows.length > 0,
+    })
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message })
+  }
 })
+
+app.use('/api/setup', setupRoutes)
 
 app.use('/api/auth', authRoutes)
 app.use('/api/ebooks', ebookRoutes)

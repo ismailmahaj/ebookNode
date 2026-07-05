@@ -19,4 +19,5 @@ export const config = {
     name: process.env.ADMIN_NAME || 'Administrateur',
     syncPassword: process.env.ADMIN_SYNC_PASSWORD === 'true',
   },
+  setupSecret: process.env.ADMIN_SETUP_SECRET || '',
 }

@@ -112,6 +112,13 @@ export async function runSeed(client) {
     return
   }
 
+  // Ré-assurer is_admin=true (correction si flag perdu)
+  await client.query(
+    `UPDATE users SET is_admin = TRUE, subscription_status = 'active', updated_at = NOW()
+     WHERE email = $1 AND is_admin = FALSE`,
+    [email]
+  )
+
   if (config.admin.syncPassword) {
     await client.query(
       `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE email = $2`,

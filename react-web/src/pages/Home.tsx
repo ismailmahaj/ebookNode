@@ -85,7 +85,7 @@ export default function Home() {
             <BookOpen className="w-8 h-8 text-netflix-red" />
             <span className="font-display text-2xl tracking-wider text-white">E-BOOK</span>
           </a>
-          <nav className="hidden md:flex gap-6 text-sm text-netflix-white/90">
+          <nav className="flex gap-4 sm:gap-6 text-sm text-netflix-white/90">
             <Link to="/" className="hover:text-white">Accueil</Link>
             {user?.is_admin && (
               <Link to="/admin/ebooks" className="text-netflix-red hover:text-netflix-red-hover font-medium">
@@ -94,7 +94,15 @@ export default function Home() {
             )}
           </nav>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          {user?.is_admin && (
+            <Link
+              to="/admin/ebooks/new"
+              className="hidden sm:inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded bg-netflix-red hover:bg-netflix-red-hover text-white font-medium"
+            >
+              + Ebook
+            </Link>
+          )}
           <span className="text-sm text-netflix-white/80 truncate max-w-[120px] md:max-w-[180px]">
             {user?.name ?? user?.email}
           </span>
