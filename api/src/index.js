@@ -4,6 +4,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { config } from './config.js'
 import { pool } from './db/pool.js'
+import { initDatabase } from './db/init.js'
 import authRoutes from './routes/auth.js'
 import ebookRoutes from './routes/ebooks.js'
 import adminRoutes from './routes/admin.js'
@@ -41,9 +42,9 @@ async function start() {
   try {
     await pool.query('SELECT 1')
     console.log('PostgreSQL connecté')
+    await initDatabase(pool)
   } catch (err) {
-    console.error('Impossible de se connecter à PostgreSQL:', err.message)
-    console.error('Vérifiez DATABASE_URL et exécutez: npm run db:migrate && npm run db:seed')
+    console.error('Impossible de démarrer:', err.message)
     process.exit(1)
   }
 

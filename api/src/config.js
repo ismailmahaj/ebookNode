@@ -17,5 +17,6 @@ export const config = {
     email: process.env.ADMIN_EMAIL || 'admin@ebook.local',
     password: process.env.ADMIN_PASSWORD || 'admin123456',
     name: process.env.ADMIN_NAME || 'Administrateur',
+    syncPassword: process.env.ADMIN_SYNC_PASSWORD === 'true',
   },
 }
