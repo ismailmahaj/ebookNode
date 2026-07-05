@@ -1,0 +1,8 @@
+# Monorepo E-BOOK — 2 services Railway requis
+#
+# Ce fichier est informatif. Crée 2 services depuis le même repo GitHub :
+#
+# 1. API     → Root Directory: api        → voir api/railway.env
+# 2. Front   → Root Directory: react-web  → voir react-web/railway.env
+#
+# Documentation complète : RAILWAY.md

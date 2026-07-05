@@ -6,3 +6,6 @@ startCommand = "npm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
+
+# Railway : Root Directory = api
+# Variables : voir api/railway.env
