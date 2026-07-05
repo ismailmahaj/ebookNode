@@ -30,7 +30,7 @@
 1. **New** → **GitHub Repo** → `ismailmahaj/ebookNode`
 2. **Settings** → **Root Directory** → `api`
 3. **Settings** → **Networking** → **Generate Domain**
-   - Exemple : `https://ebooknode-production.up.railway.app`
+   - Exemple : `https://ebooknode-production-06ee.up.railway.app`
 
 ### Variables (onglet Variables)
 
@@ -41,7 +41,7 @@ NODE_ENV=production
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 JWT_SECRET=ebook-jwt-secret-changez-moi-32-caracteres-min
 JWT_EXPIRES_IN=7d
-APP_URL=https://ebooknode-production.up.railway.app
+APP_URL=https://ebooknode-production-06ee.up.railway.app
 CORS_ORIGINS=https://ebookreact-production.up.railway.app
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=AdminExample2024!
@@ -54,7 +54,7 @@ ADMIN_SETUP_SECRET=SetupSecret2024!
 > clique **Add Reference** → sélectionne ton PostgreSQL → `DATABASE_URL`
 
 ### Vérification
-Ouvre : `https://ebooknode-production.up.railway.app/api/health`
+Ouvre : `https://ebooknode-production-06ee.up.railway.app/api/health`
 
 Réponse attendue :
 ```json
@@ -79,7 +79,7 @@ Réponse attendue :
 ### Variables (AVANT le build)
 
 ```env
-VITE_API_URL=https://ebooknode-production.up.railway.app
+VITE_API_URL=https://ebooknode-production-06ee.up.railway.app
 ```
 
 ⚠️ **Obligatoire avant le deploy** — Vite intègre cette URL au build.
@@ -106,7 +106,7 @@ Créé automatiquement au démarrage de l’API.
 ### Secours — promouvoir admin manuellement
 
 ```bash
-curl -X POST https://ebooknode-production.up.railway.app/api/setup/promote-admin \
+curl -X POST https://ebooknode-production-06ee.up.railway.app/api/setup/promote-admin \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@example.com",
@@ -148,6 +148,6 @@ curl -X POST https://ebooknode-production.up.railway.app/api/setup/promote-admin
 | Service | URL |
 |---------|-----|
 | Front | https://ebookreact-production.up.railway.app |
-| API | https://ebooknode-production.up.railway.app *(à générer)* |
-| Health | https://ebooknode-production.up.railway.app/api/health |
+| API | https://ebooknode-production-06ee.up.railway.app |
+| Health | https://ebooknode-production-06ee.up.railway.app/api/health |
 | Admin | https://ebookreact-production.up.railway.app/admin/ebooks |
