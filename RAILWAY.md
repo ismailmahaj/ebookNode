@@ -136,7 +136,8 @@ curl -X POST https://ebooknode-production.up.railway.app/api/setup/promote-admin
 |----------|-------|-----|
 | Pas de lien Admin | Front sans `VITE_API_URL` | Ajouter variable + redéployer front |
 | Login ne marche pas | API sans domaine public | Generate Domain sur service `api` |
-| CORS error | `CORS_ORIGINS` incorrect | Mettre l’URL exacte du front |
+| CORS error | API down ou mauvaise URL | Vérifier `/api/health` — doit retourner JSON, pas 404 |
+| CORS error | `CORS_ORIGINS` incorrect | `https://ebookreact-production.up.railway.app` (sans `/` à la fin) |
 | Images cassées | `APP_URL` incorrect | = URL publique de l’API |
 | `hasAdmin: false` | Seed pas exécuté | Redéployer API ou route `/api/setup/promote-admin` |
 

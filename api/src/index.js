@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { config } from './config.js'
 import { pool } from './db/pool.js'
 import { initDatabase } from './db/init.js'
+import { corsOptions, corsMiddleware } from './middleware/cors.js'
 import authRoutes from './routes/auth.js'
 import ebookRoutes from './routes/ebooks.js'
 import adminRoutes from './routes/admin.js'
@@ -14,10 +15,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 
-app.use(cors({
-  origin: config.corsOrigins,
-  credentials: true,
-}))
+app.use(corsMiddleware())
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -66,6 +66,7 @@ async function start() {
 
   app.listen(config.port, () => {
     console.log(`API démarrée sur ${config.appUrl} (port ${config.port})`)
+    console.log(`CORS autorisés: ${config.corsOrigins.join(', ') || '(aucun — fallback railway.app en prod)'}`)
   })
 }
 
