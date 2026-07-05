@@ -12,6 +12,7 @@ import AdminEbookForm from './pages/admin/AdminEbookForm'
 import AdminUsers from './pages/admin/AdminUsers'
 import SubscriptionSuccess from './pages/SubscriptionSuccess'
 import SubscriptionCancel from './pages/SubscriptionCancel'
+import InstallPWA from './components/InstallPWA'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -57,6 +58,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <InstallPWA />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

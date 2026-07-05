@@ -2,9 +2,12 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Toaster } from 'react-hot-toast'
 import { pdfjs } from 'react-pdf'
+import { registerSW } from 'virtual:pwa-register'
 import { ErrorBoundary } from './ErrorBoundary'
 import App from './App'
 import './index.css'
+
+registerSW({ immediate: true })
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
