@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { Document, Page } from 'react-pdf'
 import { getPdfBlobUrl, getEbook, PdfLoadError } from '../api/ebooks'
+import { getOfflinePdf } from '../utils/offlineLibrary'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -10,6 +11,7 @@ export default function EbookReader() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const preview = searchParams.get('preview') === '1'
+  const offlineMode = searchParams.get('offline') === '1'
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [numPages, setNumPages] = useState<number | null>(null)
@@ -18,40 +20,67 @@ export default function EbookReader() {
   const [error, setError] = useState<string | null>(null)
   const [errorForbidden, setErrorForbidden] = useState(false)
   const [title, setTitle] = useState<string>('')
+  const [isOfflineSource, setIsOfflineSource] = useState(false)
 
   useEffect(() => {
     if (!id) return
     let objectUrl: string | null = null
     let cancelled = false
 
-    getEbook(Number(id)).then((e) => {
-      if (!cancelled) setTitle(e.title)
-    }).catch(() => {})
+    async function loadPdf() {
+      getEbook(Number(id)).then((e) => {
+        if (!cancelled) setTitle(e.title)
+      }).catch(() => {})
 
-    getPdfBlobUrl(Number(id), preview)
-      .then((url) => {
-        if (!cancelled) {
-          objectUrl = url
-          setPdfUrl(url)
-        } else {
-          URL.revokeObjectURL(url)
+      try {
+        if (offlineMode) {
+          const blob = await getOfflinePdf(Number(id))
+          if (!blob) {
+            throw new PdfLoadError('Ce livre n\'est pas disponible hors ligne.', 'NOT_FOUND')
+          }
+          objectUrl = URL.createObjectURL(blob)
+          if (!cancelled) {
+            setPdfUrl(objectUrl)
+            setIsOfflineSource(true)
+          }
+          return
         }
-      })
-      .catch((e) => {
+
+        try {
+          const url = await getPdfBlobUrl(Number(id), preview)
+          objectUrl = url
+          if (!cancelled) setPdfUrl(url)
+        } catch (e) {
+          if (!preview && !navigator.onLine) {
+            const blob = await getOfflinePdf(Number(id))
+            if (blob) {
+              objectUrl = URL.createObjectURL(blob)
+              if (!cancelled) {
+                setPdfUrl(objectUrl)
+                setIsOfflineSource(true)
+                return
+              }
+            }
+          }
+          throw e
+        }
+      } catch (e) {
         if (!cancelled) {
           setError(e instanceof PdfLoadError ? e.message : 'Impossible de charger le PDF')
           setErrorForbidden(e instanceof PdfLoadError && e.code === 'FORBIDDEN')
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    loadPdf()
 
     return () => {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [id, preview])
+  }, [id, preview, offlineMode])
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
@@ -71,8 +100,8 @@ export default function EbookReader() {
       <div className="fixed inset-0 bg-netflix-black flex flex-col items-center justify-center gap-4 z-50 px-4">
         <p className="text-netflix-white/90 text-center">{error ?? 'PDF introuvable'}</p>
         {errorForbidden && (
-          <Link to="/" className="text-netflix-red hover:underline">
-            Voir mon abonnement
+          <Link to="/subscription" className="text-netflix-red hover:underline">
+            S&apos;abonner pour lire en entier
           </Link>
         )}
         <Link to={id ? `/ebook/${id}` : '/'} className="text-netflix-red hover:underline">
@@ -84,7 +113,6 @@ export default function EbookReader() {
 
   return (
     <div className="fixed inset-0 bg-netflix-black flex flex-col z-50">
-      {/* Barre du lecteur */}
       <div className="flex items-center justify-between px-4 h-14 bg-black/80 border-b border-white/10 flex-shrink-0">
         <Link
           to={id ? `/ebook/${id}` : '/'}
@@ -94,6 +122,9 @@ export default function EbookReader() {
         </Link>
         <span className="text-netflix-white/90 text-sm truncate max-w-[50%]" title={title}>
           {title}
+          {isOfflineSource && (
+            <span className="ml-2 text-xs text-green-400">(hors ligne)</span>
+          )}
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -118,7 +149,6 @@ export default function EbookReader() {
         </div>
       </div>
 
-      {/* Zone PDF */}
       <div className="flex-1 overflow-auto flex justify-center p-4">
         <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess} loading={null}>
           <Page

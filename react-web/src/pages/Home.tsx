@@ -7,7 +7,7 @@ import {
   type Ebook as EbookType,
   type Category,
 } from '../api/ebooks'
-import { BookOpen, LogOut } from 'lucide-react'
+import { BookOpen, LogOut, Crown } from 'lucide-react'
 
 function EbookCard({ ebook }: { ebook: EbookType }) {
   return (
@@ -149,6 +149,14 @@ export default function Home() {
               className="hidden sm:inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded bg-netflix-red hover:bg-netflix-red-hover text-white font-medium"
             >
               + Ebook
+            </Link>
+          )}
+          {user && !user.is_admin && !user.has_active_subscription && (
+            <Link
+              to="/subscription"
+              className="hidden sm:inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 border border-yellow-500/30 font-medium"
+            >
+              <Crown className="w-4 h-4" /> S&apos;abonner
             </Link>
           )}
           <span className="text-sm text-netflix-white/80 truncate max-w-[120px] md:max-w-[180px]">

@@ -31,7 +31,7 @@ export default function Register() {
     try {
       await register({ name, email, password, password_confirmation: passwordConfirmation })
       toast.success('Inscription réussie')
-      navigate('/', { replace: true })
+      navigate('/subscription', { replace: true })
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message

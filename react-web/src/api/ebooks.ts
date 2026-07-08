@@ -98,6 +98,30 @@ export class PdfLoadError extends Error {
   }
 }
 
+export async function getPdfBlob(ebookId: number): Promise<Blob> {
+  try {
+    const { data } = await api.get<Blob>(`/ebooks/${ebookId}/stream`, { responseType: 'blob' })
+    if (data instanceof Blob && data.type?.includes('application/json')) {
+      const text = await data.text()
+      const json = JSON.parse(text) as { message?: string }
+      throw new PdfLoadError(json.message ?? 'Erreur serveur', 'UNKNOWN')
+    }
+    return data
+  } catch (err: unknown) {
+    if (err instanceof PdfLoadError) throw err
+    const status = err && typeof err === 'object' && 'response' in err
+      ? (err as { response?: { status?: number } }).response?.status
+      : undefined
+    if (status === 403) {
+      throw new PdfLoadError('Un abonnement actif est requis pour lire ce livre.', 'FORBIDDEN')
+    }
+    if (status === 404) {
+      throw new PdfLoadError('Fichier PDF non disponible.', 'NOT_FOUND')
+    }
+    throw new PdfLoadError('Impossible de charger le PDF.', 'UNKNOWN')
+  }
+}
+
 /**
  * Récupère le PDF (aperçu ou complet) en blob et retourne une object URL.
  * Penser à appeler URL.revokeObjectURL(url) quand on n'en a plus besoin.

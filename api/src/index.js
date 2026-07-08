@@ -11,6 +11,8 @@ import ebookRoutes from './routes/ebooks.js'
 import categoryRoutes from './routes/categories.js'
 import adminRoutes from './routes/admin.js'
 import setupRoutes from './routes/setup.js'
+import webhookRoutes from './routes/webhooks.js'
+import subscriptionRoutes from './routes/subscription.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -19,6 +21,8 @@ const app = express()
 app.use(corsMiddleware())
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
+
+app.use('/api/webhooks', webhookRoutes)
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -48,6 +52,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/ebooks', ebookRoutes)
 app.use('/api/categories', categoryRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/subscription', subscriptionRoutes)
 
 app.use((err, _req, res, _next) => {
   console.error(err)

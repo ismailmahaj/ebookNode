@@ -10,6 +10,7 @@ import AdminLayout from './pages/admin/AdminLayout'
 import AdminEbookList from './pages/admin/AdminEbookList'
 import AdminEbookForm from './pages/admin/AdminEbookForm'
 import AdminUsers from './pages/admin/AdminUsers'
+import Subscription from './pages/Subscription'
 import SubscriptionSuccess from './pages/SubscriptionSuccess'
 import SubscriptionCancel from './pages/SubscriptionCancel'
 import InstallPWA from './components/InstallPWA'
@@ -62,6 +63,14 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route
+          path="/subscription"
+          element={
+            <ProtectedRoute>
+              <Subscription />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/subscription/success" element={<SubscriptionSuccess />} />
         <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
         <Route

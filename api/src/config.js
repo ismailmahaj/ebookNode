@@ -20,4 +20,22 @@ export const config = {
     syncPassword: process.env.ADMIN_SYNC_PASSWORD === 'true',
   },
   setupSecret: process.env.ADMIN_SETUP_SECRET || '',
+  frontendUrl: (
+    process.env.FRONTEND_URL ||
+    process.env.CORS_ORIGINS?.split(',')[0]?.trim() ||
+    'http://localhost:5173'
+  ).replace(/\/$/, ''),
+  subscription: {
+    priceEur: parseFloat(process.env.SUBSCRIPTION_PRICE_EUR || '3.99'),
+  },
+  airwallex: {
+    apiBase: (process.env.AIRWALLEX_API_BASE || 'https://api-demo.airwallex.com').replace(/\/$/, ''),
+    clientId: process.env.AIRWALLEX_CLIENT_ID || '',
+    apiKey: process.env.AIRWALLEX_API_KEY || '',
+    webhookSecret: process.env.AIRWALLEX_WEBHOOK_SECRET || '',
+    priceId: process.env.AIRWALLEX_PRICE_ID || '',
+    legalEntityId: process.env.AIRWALLEX_LEGAL_ENTITY_ID || '',
+    linkedPaymentAccountId: process.env.AIRWALLEX_LINKED_PAYMENT_ACCOUNT_ID || '',
+    loginAs: process.env.AIRWALLEX_LOGIN_AS || '',
+  },
 }

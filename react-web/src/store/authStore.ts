@@ -7,6 +7,9 @@ export interface User {
   name: string
   email: string
   is_admin?: boolean
+  subscription_status?: string | null
+  subscription_ends_at?: string | null
+  has_active_subscription?: boolean
 }
 
 function normalizeUser(raw: unknown): User | null {
@@ -20,6 +23,9 @@ function normalizeUser(raw: unknown): User | null {
     name: String(data.name ?? ''),
     email: String(data.email),
     is_admin: data.is_admin === true || data.is_admin === 1 || data.is_admin === 'true',
+    subscription_status: data.subscription_status != null ? String(data.subscription_status) : null,
+    subscription_ends_at: data.subscription_ends_at != null ? String(data.subscription_ends_at) : null,
+    has_active_subscription: data.has_active_subscription === true,
   }
 }
 
@@ -32,6 +38,7 @@ interface AuthState {
   register: (data: { name: string; email: string; password: string; password_confirmation: string }) => Promise<unknown>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
+  refreshUser: (user: User) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -98,6 +105,9 @@ export const useAuthStore = create<AuthState>()(
           set({ user: null, token: null, isAuthenticated: false })
           localStorage.removeItem('token')
         }
+      },
+      refreshUser: (user) => {
+        set({ user, isAuthenticated: true })
       },
     }),
     { name: 'auth-storage', partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }) }

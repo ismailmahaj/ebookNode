@@ -9,10 +9,10 @@ export default function SubscriptionCancel() {
           Vous n&apos;avez pas finalisé l&apos;abonnement. Vous pouvez réessayer à tout moment.
         </p>
         <Link
-          to="/"
+          to="/subscription"
           className="inline-block bg-netflix-red hover:bg-netflix-red-hover text-white font-medium px-6 py-3 rounded"
         >
-          Retour au catalogue
+          Réessayer l&apos;abonnement
         </Link>
       </div>
     </div>

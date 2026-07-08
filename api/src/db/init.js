@@ -66,10 +66,22 @@ const defaultCategories = [
   { name: 'Histoire', description: 'Récits historiques et biographies' },
 ]
 
+const subscriptionMigrations = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS airwallex_customer_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS airwallex_subscription_id VARCHAR(255);
+
+CREATE TABLE IF NOT EXISTS billing_events (
+  id VARCHAR(255) PRIMARY KEY,
+  event_type VARCHAR(100),
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`
+
 export async function runMigrations(client) {
   await client.query('BEGIN')
   try {
     await client.query(migrations)
+    await client.query(subscriptionMigrations)
     await client.query('COMMIT')
   } catch (err) {
     await client.query('ROLLBACK')

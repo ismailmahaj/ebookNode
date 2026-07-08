@@ -31,14 +31,12 @@ router.post('/register', async (req, res) => {
   }
 
   const hash = await bcrypt.hash(password, 12)
-  const trialEnds = new Date()
-  trialEnds.setDate(trialEnds.getDate() + 7)
 
   const { rows } = await query(
-    `INSERT INTO users (name, email, password_hash, trial_ends_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (name, email, password_hash, subscription_status)
+     VALUES ($1, $2, $3, 'inactive')
      RETURNING *`,
-    [name.trim(), email.trim().toLowerCase(), hash, trialEnds.toISOString()]
+    [name.trim(), email.trim().toLowerCase(), hash]
   )
 
   const user = rows[0]
