@@ -8,6 +8,7 @@ import { initDatabase } from './db/init.js'
 import { corsOptions, corsMiddleware } from './middleware/cors.js'
 import authRoutes from './routes/auth.js'
 import ebookRoutes from './routes/ebooks.js'
+import categoryRoutes from './routes/categories.js'
 import adminRoutes from './routes/admin.js'
 import setupRoutes from './routes/setup.js'
 
@@ -45,6 +46,7 @@ app.use('/api/setup', setupRoutes)
 
 app.use('/api/auth', authRoutes)
 app.use('/api/ebooks', ebookRoutes)
+app.use('/api/categories', categoryRoutes)
 app.use('/api/admin', adminRoutes)
 
 app.use((err, _req, res, _next) => {

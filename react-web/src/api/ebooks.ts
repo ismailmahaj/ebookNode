@@ -79,6 +79,15 @@ export async function getEbook(id: number): Promise<Ebook> {
   return data
 }
 
+export interface CategoryWithCount extends Category {
+  ebooks_count: number
+}
+
+export async function getCategories(): Promise<CategoryWithCount[]> {
+  const { data } = await api.get<CategoryWithCount[]>('/categories')
+  return data
+}
+
 export class PdfLoadError extends Error {
   constructor(
     message: string,

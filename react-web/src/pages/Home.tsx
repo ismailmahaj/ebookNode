@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { getEbooks, getCoverImageUrl, type Ebook as EbookType } from '../api/ebooks'
+import {
+  getEbooks,
+  getCategories,
+  getCoverImageUrl,
+  type Ebook as EbookType,
+  type CategoryWithCount,
+} from '../api/ebooks'
 import { BookOpen, LogOut } from 'lucide-react'
 
 function EbookCard({ ebook }: { ebook: EbookType }) {
@@ -39,34 +45,67 @@ function Carousel({ title, ebooks }: { title: string; ebooks: EbookType[] }) {
   )
 }
 
+function Grid({ ebooks }: { ebooks: EbookType[] }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 px-4 md:px-8">
+      {ebooks.map((ebook) => (
+        <EbookCard key={ebook.id} ebook={ebook} />
+      ))}
+    </div>
+  )
+}
+
+interface CategorySection {
+  category: CategoryWithCount
+  ebooks: EbookType[]
+}
+
 export default function Home() {
   const { user, logout } = useAuthStore()
   const [featured, setFeatured] = useState<EbookType[]>([])
-  const [trending, setTrending] = useState<EbookType[]>([])
   const [recent, setRecent] = useState<EbookType[]>([])
+  const [categories, setCategories] = useState<CategoryWithCount[]>([])
+  const [sections, setSections] = useState<CategorySection[]>([])
   const [loading, setLoading] = useState(true)
   const [heroEbook, setHeroEbook] = useState<EbookType | null>(null)
+
+  // null = toutes les catégories (vue Netflix), sinon la catégorie sélectionnée
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [filtered, setFiltered] = useState<EbookType[]>([])
+  const [filtering, setFiltering] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        const [featRes, trendRes, recentRes] = await Promise.all([
+        const [featRes, recentRes, cats] = await Promise.all([
           getEbooks({ featured: true, per_page: 12 }),
-          getEbooks({ sort_by: 'published_at', sort_order: 'desc', per_page: 16 }),
           getEbooks({ sort_by: 'created_at', sort_order: 'desc', per_page: 16 }),
+          getCategories(),
         ])
         if (cancelled) return
+
         setFeatured(featRes.data || [])
-        setTrending(trendRes.data || [])
         setRecent(recentRes.data || [])
-        const hero = (featRes.data && featRes.data[0]) || (trendRes.data && trendRes.data[0])
+        setCategories(cats || [])
+
+        const hero = (featRes.data && featRes.data[0]) || (recentRes.data && recentRes.data[0])
         setHeroEbook(hero || null)
+
+        const results = await Promise.all(
+          (cats || []).map(async (category) => {
+            const res = await getEbooks({ category_id: category.id, per_page: 16 })
+            return { category, ebooks: res.data || [] }
+          })
+        )
+        if (!cancelled) {
+          setSections(results.filter((s) => s.ebooks.length > 0))
+        }
       } catch {
         if (!cancelled) {
           setFeatured([])
-          setTrending([])
           setRecent([])
+          setSections([])
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -75,6 +114,19 @@ export default function Home() {
     load()
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (selectedCategory === null) return
+    let cancelled = false
+    setFiltering(true)
+    getEbooks({ category_id: selectedCategory, per_page: 48 })
+      .then((res) => { if (!cancelled) setFiltered(res.data || []) })
+      .catch(() => { if (!cancelled) setFiltered([]) })
+      .finally(() => { if (!cancelled) setFiltering(false) })
+    return () => { cancelled = true }
+  }, [selectedCategory])
+
+  const activeCategoryName = categories.find((c) => c.id === selectedCategory)?.name
 
   return (
     <div className="min-h-screen bg-netflix-black">
@@ -123,8 +175,8 @@ export default function Home() {
           </div>
         ) : (
           <>
-            {/* Hero : grande bannière type Netflix */}
-            {heroEbook && (
+            {/* Hero : uniquement en vue "toutes catégories" */}
+            {selectedCategory === null && heroEbook && (
               <section className="relative h-[50vh] min-h-[320px] flex items-end pb-12 md:pb-16">
                 <div
                   className="absolute inset-0 bg-cover bg-center"
@@ -144,7 +196,7 @@ export default function Home() {
                   </p>
                   <div className="flex gap-3 mt-4">
                     <Link
-                      to={heroEbook ? `/ebook/${heroEbook.id}` : '#'}
+                      to={`/ebook/${heroEbook.id}`}
                       className="flex items-center gap-2 px-6 py-2.5 bg-netflix-red hover:bg-netflix-red-hover text-white font-semibold rounded transition-colors"
                     >
                       <BookOpen className="w-5 h-5" /> Voir le détail
@@ -154,23 +206,76 @@ export default function Home() {
               </section>
             )}
 
-            {/* Carrousels */}
-            <div className="pb-12 -mt-8">
-              {featured.length > 0 && (
-                <Carousel title="À ne pas manquer" ebooks={featured} />
-              )}
-              {trending.length > 0 && (
-                <Carousel title="Tendances" ebooks={trending} />
-              )}
-              {recent.length > 0 && (
-                <Carousel title="Ajouts récents" ebooks={recent} />
-              )}
-              {!loading && !featured.length && !trending.length && !recent.length && (
-                <div className="text-center py-16 text-netflix-gray">
-                  <p>Aucun livre pour le moment.</p>
+            {/* Barre de catégories (genres) */}
+            {categories.length > 0 && (
+              <div className={`px-4 md:px-8 ${selectedCategory === null ? '-mt-4 mb-6' : 'mt-4 mb-6'}`}>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory(null)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      selectedCategory === null
+                        ? 'bg-netflix-red text-white'
+                        : 'bg-white/10 text-netflix-white/80 hover:bg-white/20'
+                    }`}
+                  >
+                    Tout
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        selectedCategory === cat.id
+                          ? 'bg-netflix-red text-white'
+                          : 'bg-white/10 text-netflix-white/80 hover:bg-white/20'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Vue filtrée : une seule catégorie en grille */}
+            {selectedCategory !== null ? (
+              <div className="pb-12">
+                <h2 className="font-display text-2xl md:text-3xl tracking-wide text-white mb-4 px-4 md:px-8">
+                  {activeCategoryName}
+                </h2>
+                {filtering ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-netflix-red border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : filtered.length > 0 ? (
+                  <Grid ebooks={filtered} />
+                ) : (
+                  <p className="text-netflix-gray px-4 md:px-8 py-8">
+                    Aucun livre dans cette catégorie.
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Vue Netflix : rangées */
+              <div className="pb-12 -mt-4">
+                {featured.length > 0 && (
+                  <Carousel title="À ne pas manquer" ebooks={featured} />
+                )}
+                {recent.length > 0 && (
+                  <Carousel title="Ajouts récents" ebooks={recent} />
+                )}
+                {sections.map(({ category, ebooks }) => (
+                  <Carousel key={category.id} title={category.name} ebooks={ebooks} />
+                ))}
+                {!featured.length && !recent.length && !sections.length && (
+                  <div className="text-center py-16 text-netflix-gray">
+                    <p>Aucun livre pour le moment.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>
