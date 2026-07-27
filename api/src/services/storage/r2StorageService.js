@@ -21,12 +21,18 @@ function requireR2() {
   }
 }
 
+/** Métadonnées S3/R2 : headers HTTP = ASCII uniquement. */
+function toAsciiMetaValue(value) {
+  const s = String(value).slice(0, 900)
+  if (/^[\x20-\x7E]*$/.test(s)) return s
+  return encodeURIComponent(s).slice(0, 1024)
+}
+
 function stringMeta(metadata = {}) {
   const out = {}
   for (const [k, v] of Object.entries(metadata)) {
-    if (v == null) continue
-    // S3 metadata: ASCII strings only
-    out[String(k).toLowerCase()] = String(v).slice(0, 1024)
+    if (v == null || v === '') continue
+    out[String(k).toLowerCase()] = toAsciiMetaValue(v)
   }
   return out
 }
@@ -45,13 +51,26 @@ export async function uploadObject({
     Bucket: getR2Bucket(),
     Key: key,
     Body: body,
-    ContentType: contentType,
+    ContentType: contentType || 'application/octet-stream',
     Metadata: stringMeta(metadata),
   }
   if (contentLength != null) params.ContentLength = contentLength
   if (cacheControl) params.CacheControl = cacheControl
 
-  await client.send(new PutObjectCommand(params))
+  try {
+    await client.send(new PutObjectCommand(params))
+  } catch (err) {
+    const msg = err?.message || 'Échec upload R2'
+    console.error('[R2] PutObject failed', { key, message: msg, name: err?.name })
+    const wrapped = new Error(
+      /ascii|Invalid character|signature/i.test(msg)
+        ? 'Échec upload R2 (métadonnées/fichier invalides)'
+        : `Échec upload R2: ${msg}`
+    )
+    wrapped.status = err?.$metadata?.httpStatusCode === 403 ? 503 : 502
+    wrapped.cause = err
+    throw wrapped
+  }
   return { key, bucket: getR2Bucket() }
 }
 

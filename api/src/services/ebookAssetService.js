@@ -112,13 +112,8 @@ export async function uploadEbookAsset({
     body: buffer,
     contentType: validated.contentType,
     contentLength: buffer.length,
-    metadata: {
-      'ebook-id': String(ebookId),
-      'asset-type': assetType,
-      'original-filename': String(validated.safeName || '').slice(0, 200),
-      'uploaded-by': String(uploadedBy || ''),
-      'upload-date': new Date().toISOString(),
-    },
+    // Pas de Metadata custom : R2/S3 refuse souvent les caractères non-ASCII
+    // (accents dans le nom de fichier). Les infos restent en base.
   })
 
   const exists = await objectExists(key)

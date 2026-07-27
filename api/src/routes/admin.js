@@ -209,72 +209,84 @@ router.post('/ebooks', (req, res, next) => {
         totalPages = await countPdfPages(pdfFile.path)
       }
 
-      const { rows } = await query(
-        `INSERT INTO ebooks (
-          title, slug, author, description, isbn,
-          cover_image_path, pdf_file_path, pdf_file_size, total_pages,
-          preview_pages, published_at, is_featured, is_active, storage_provider
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-        RETURNING *`,
-        [
-          body.title.trim(),
-          slug,
-          body.author.trim(),
-          body.description.trim(),
-          body.isbn?.trim() || null,
-          useR2 ? null : publicPath('covers', coverFile.filename),
-          useR2 ? null : publicPath('pdfs', pdfFile.filename),
-          pdfFile.size,
-          totalPages,
-          parseInt(body.preview_pages, 10) || 10,
-          body.published_at || null,
-          parseBool(body.is_featured) ?? false,
-          parseBool(body.is_active) ?? true,
-          useR2 ? 'cloudflare-r2' : 'local',
-        ]
-      )
+      let ebookId = null
+      try {
+        const { rows } = await query(
+          `INSERT INTO ebooks (
+            title, slug, author, description, isbn,
+            cover_image_path, pdf_file_path, pdf_file_size, total_pages,
+            preview_pages, published_at, is_featured, is_active, storage_provider
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          RETURNING *`,
+          [
+            body.title.trim(),
+            slug,
+            body.author.trim(),
+            body.description.trim(),
+            body.isbn?.trim() || null,
+            // '' si R2 (évite NOT NULL si migration partielle) ; chemin local sinon
+            useR2 ? '' : publicPath('covers', coverFile.filename),
+            useR2 ? '' : publicPath('pdfs', pdfFile.filename),
+            pdfFile.size,
+            totalPages,
+            parseInt(body.preview_pages, 10) || 10,
+            body.published_at || null,
+            parseBool(body.is_featured) ?? false,
+            parseBool(body.is_active) ?? true,
+            useR2 ? 'cloudflare-r2' : 'local',
+          ]
+        )
 
-      const ebookId = rows[0].id
+        ebookId = rows[0].id
 
-      if (useR2) {
-        await uploadEbookAsset({
-          ebookId,
-          assetType: 'PDF',
-          buffer: pdfFile.buffer,
-          originalname: pdfFile.originalname,
-          mimetype: pdfFile.mimetype,
-          size: pdfFile.size,
-          uploadedBy: req.user.id,
-        })
-        await uploadEbookAsset({
-          ebookId,
-          assetType: 'COVER',
-          buffer: coverFile.buffer,
-          originalname: coverFile.originalname,
-          mimetype: coverFile.mimetype,
-          size: coverFile.size,
-          uploadedBy: req.user.id,
-        })
-
-        // Optional extra fields
-        for (const field of ['epub_file', 'preview_pdf', 'preview_epub', 'audio_file', 'audio_preview']) {
-          const f = req.files?.[field]?.[0]
-          if (!f?.buffer) continue
+        if (useR2) {
           await uploadEbookAsset({
             ebookId,
-            assetType: assetTypeFromField(field),
-            buffer: f.buffer,
-            originalname: f.originalname,
-            mimetype: f.mimetype,
-            size: f.size,
+            assetType: 'PDF',
+            buffer: pdfFile.buffer,
+            originalname: pdfFile.originalname,
+            mimetype: pdfFile.mimetype,
+            size: pdfFile.size,
             uploadedBy: req.user.id,
           })
-        }
-      }
+          await uploadEbookAsset({
+            ebookId,
+            assetType: 'COVER',
+            buffer: coverFile.buffer,
+            originalname: coverFile.originalname,
+            mimetype: coverFile.mimetype,
+            size: coverFile.size,
+            uploadedBy: req.user.id,
+          })
 
-      await syncCategories(ebookId, categoryIds)
-      const ebook = await getEbookWithCategories(ebookId)
-      res.status(201).json({ ebook })
+          for (const field of ['epub_file', 'preview_pdf', 'preview_epub', 'audio_file', 'audio_preview']) {
+            const f = req.files?.[field]?.[0]
+            if (!f?.buffer) continue
+            await uploadEbookAsset({
+              ebookId,
+              assetType: assetTypeFromField(field),
+              buffer: f.buffer,
+              originalname: f.originalname,
+              mimetype: f.mimetype,
+              size: f.size,
+              uploadedBy: req.user.id,
+            })
+          }
+        }
+
+        await syncCategories(ebookId, categoryIds)
+        const ebook = await getEbookWithCategories(ebookId)
+        res.status(201).json({ ebook })
+      } catch (inner) {
+        if (ebookId) {
+          try {
+            await query('DELETE FROM ebooks WHERE id = $1', [ebookId])
+          } catch (cleanupErr) {
+            console.error('[admin] cleanup ebook après échec upload', cleanupErr)
+          }
+        }
+        throw inner
+      }
     } catch (e) {
       next(e)
     }

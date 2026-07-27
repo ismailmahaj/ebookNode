@@ -37,6 +37,9 @@ export function getR2Client() {
         secretAccessKey: config.r2.secretAccessKey,
       },
       forcePathStyle: false,
+      // SDK >= 3.729 envoie des checksums CRC32 non supportés par R2 (501)
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     })
   }
   return client

@@ -67,11 +67,14 @@ app.use('/api/subscription', subscriptionRoutes)
 app.use((err, _req, res, _next) => {
   console.error(err)
   const status = err.status || err.statusCode || 500
+  const expose =
+    status < 500 ||
+    status === 502 ||
+    status === 503 ||
+    err.expose === true ||
+    config.nodeEnv === 'development'
   res.status(status).json({
-    message:
-      status < 500 || config.nodeEnv === 'development'
-        ? err.message
-        : 'Erreur serveur interne',
+    message: expose && err.message ? err.message : 'Erreur serveur interne',
   })
 })
 
