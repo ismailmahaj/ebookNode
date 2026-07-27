@@ -62,17 +62,32 @@ describe('fileValidation', () => {
     )
   })
 
-  it('refuse path traversal', () => {
-    assert.throws(
-      () =>
-        validateUploadFile({
-          assetType: 'PDF',
-          originalname: '../etc/passwd.pdf',
-          mimetype: 'application/pdf',
-          size: 10,
-        }),
-      FileValidationError
-    )
+  it('normalise les chemins (Windows / traversal) en basename', () => {
+    const fromPath = validateUploadFile({
+      assetType: 'PDF',
+      originalname: '../etc/passwd.pdf',
+      mimetype: 'application/pdf',
+      size: 10,
+    })
+    assert.equal(fromPath.safeName, 'passwd.pdf')
+
+    const fromWin = validateUploadFile({
+      assetType: 'COVER',
+      originalname: 'C:\\Users\\me\\Pictures\\cover.jpg',
+      mimetype: 'image/jpeg',
+      size: 10,
+    })
+    assert.equal(fromWin.safeName, 'cover.jpg')
+  })
+
+  it('accepte un nom avec points doubles (pas un path)', () => {
+    const r = validateUploadFile({
+      assetType: 'PDF',
+      originalname: 'chapitre 1..3.pdf',
+      mimetype: 'application/pdf',
+      size: 10,
+    })
+    assert.equal(r.safeName, 'chapitre 1..3.pdf')
   })
 
   it('mappe les champs multer', () => {

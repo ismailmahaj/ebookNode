@@ -55,20 +55,33 @@ export class FileValidationError extends Error {
   }
 }
 
+/**
+ * Ne garde que le nom de fichier (sans chemin Windows/Unix).
+ * Certains navigateurs envoient un chemin complet dans originalname.
+ */
+export function sanitizeOriginalName(originalname) {
+  if (!originalname || typeof originalname !== 'string') {
+    throw new FileValidationError('Nom de fichier manquant')
+  }
+
+  const base = path.posix.basename(originalname.replace(/\\/g, '/'))
+  const cleaned = base.replace(/[\x00-\x1f]/g, '').trim()
+
+  if (!cleaned || cleaned === '.' || cleaned === '..') {
+    throw new FileValidationError('Nom de fichier invalide')
+  }
+
+  return cleaned
+}
+
 export function validateUploadFile({ assetType, originalname, mimetype, size }) {
   const rules = ALLOWED[assetType]
   if (!rules) {
     throw new FileValidationError(`Type d'asset non autorisé: ${assetType}`)
   }
 
-  if (!originalname || typeof originalname !== 'string') {
-    throw new FileValidationError('Nom de fichier manquant')
-  }
-
-  const lower = originalname.toLowerCase()
-  if (lower.includes('..') || lower.includes('/') || lower.includes('\\')) {
-    throw new FileValidationError('Nom de fichier invalide')
-  }
+  const safeName = sanitizeOriginalName(originalname)
+  const lower = safeName.toLowerCase()
 
   const ext = path.extname(lower)
   if (!ext) {
@@ -129,6 +142,7 @@ export function validateUploadFile({ assetType, originalname, mimetype, size }) 
     extension: normalizedExt,
     maxBytes,
     contentType,
+    safeName,
   }
 }
 

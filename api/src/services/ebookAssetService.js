@@ -79,9 +79,14 @@ export async function uploadEbookAsset({
     throw err
   }
 
-  validateUploadFile({ assetType, originalname, mimetype, size: size ?? buffer.length })
+  const validated = validateUploadFile({
+    assetType,
+    originalname,
+    mimetype,
+    size: size ?? buffer.length,
+  })
 
-  const key = buildEbookObjectKey(ebookId, assetType, originalname)
+  const key = buildEbookObjectKey(ebookId, assetType, validated.safeName)
   const isPreview = assetType.includes('PREVIEW')
 
   // Ancien asset READY du même type (hors chapitres audio multiples)
@@ -105,12 +110,12 @@ export async function uploadEbookAsset({
   await uploadObject({
     key,
     body: buffer,
-    contentType: mimetype,
+    contentType: validated.contentType,
     contentLength: buffer.length,
     metadata: {
       'ebook-id': String(ebookId),
       'asset-type': assetType,
-      'original-filename': String(originalname || '').slice(0, 200),
+      'original-filename': String(validated.safeName || '').slice(0, 200),
       'uploaded-by': String(uploadedBy || ''),
       'upload-date': new Date().toISOString(),
     },
@@ -142,8 +147,8 @@ export async function uploadEbookAsset({
       ebookId,
       assetType,
       key,
-      originalname,
-      mimetype,
+      validated.safeName,
+      validated.contentType,
       buffer.length,
       isPreview,
       chapterNumber || null,
@@ -202,8 +207,8 @@ export async function createPresignedUpload({
   size,
   uploadedBy,
 }) {
-  validateUploadFile({ assetType, originalname, mimetype, size })
-  const key = buildEbookObjectKey(ebookId, assetType, originalname)
+  const validated = validateUploadFile({ assetType, originalname, mimetype, size })
+  const key = buildEbookObjectKey(ebookId, assetType, validated.safeName)
 
   const { rows } = await query(
     `INSERT INTO ebook_assets (
@@ -215,15 +220,15 @@ export async function createPresignedUpload({
       ebookId,
       assetType,
       key,
-      originalname,
-      mimetype,
+      validated.safeName,
+      validated.contentType,
       size || 0,
       assetType.includes('PREVIEW'),
       uploadedBy || null,
     ]
   )
 
-  const signed = await getSignedUploadUrl(key, mimetype, 600)
+  const signed = await getSignedUploadUrl(key, validated.contentType, 600)
   return {
     asset: formatAsset(rows[0]),
     upload: signed,
