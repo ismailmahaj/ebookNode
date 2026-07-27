@@ -21,6 +21,12 @@ export default function AdminLayout() {
               Ebooks
             </Link>
             <Link
+              to="/admin/categories"
+              className="text-sm text-netflix-white/80 hover:text-white transition-colors"
+            >
+              Catégories
+            </Link>
+            <Link
               to="/admin/ebooks/new"
               className="flex items-center gap-1.5 text-sm text-netflix-red hover:text-netflix-red-hover"
             >

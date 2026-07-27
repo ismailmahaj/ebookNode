@@ -24,3 +24,20 @@ export async function uniqueSlug(queryFn, base, excludeId = null) {
     candidate = `${slug}-${i++}`
   }
 }
+
+export async function uniqueCategorySlug(queryFn, base, excludeId = null) {
+  let slug = slugify(base)
+  if (!slug) slug = 'categorie'
+  let candidate = slug
+  let i = 1
+
+  while (true) {
+    const params = excludeId ? [candidate, excludeId] : [candidate]
+    const sql = excludeId
+      ? 'SELECT id FROM categories WHERE slug = $1 AND id != $2'
+      : 'SELECT id FROM categories WHERE slug = $1'
+    const { rows } = await queryFn(sql, params)
+    if (rows.length === 0) return candidate
+    candidate = `${slug}-${i++}`
+  }
+}

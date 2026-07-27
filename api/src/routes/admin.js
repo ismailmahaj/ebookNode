@@ -17,7 +17,7 @@ import {
   validationError,
 } from '../utils/ebook.js'
 import { formatUser } from '../utils/user.js'
-import { uniqueSlug } from '../utils/slug.js'
+import { uniqueSlug, uniqueCategorySlug } from '../utils/slug.js'
 
 const router = Router()
 
@@ -126,8 +126,95 @@ async function syncCategories(ebookId, categoryIds) {
 
 router.get('/categories', async (_req, res, next) => {
   try {
-    const { rows } = await query('SELECT * FROM categories ORDER BY name')
-    res.json(rows.map(formatCategory))
+    const { rows } = await query(
+      `SELECT c.*,
+        (SELECT COUNT(*)::int FROM ebook_category ec WHERE ec.category_id = c.id) AS ebook_count
+       FROM categories c
+       ORDER BY c.name`
+    )
+    res.json(
+      rows.map((r) => ({
+        ...formatCategory(r),
+        ebook_count: r.ebook_count ?? 0,
+      }))
+    )
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/categories', async (req, res, next) => {
+  try {
+    const name = req.body?.name?.trim()
+    const description = req.body?.description?.trim() || null
+    if (!name) {
+      return validationError(res, { name: ['Le nom est requis'] })
+    }
+
+    const slug = await uniqueCategorySlug(query, name)
+    const { rows } = await query(
+      `INSERT INTO categories (name, slug, description)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [name, slug, description]
+    )
+    res.status(201).json({ category: formatCategory(rows[0]) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch('/categories/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id)
+    const existing = await query('SELECT * FROM categories WHERE id = $1', [id])
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: 'Catégorie introuvable' })
+    }
+
+    const name = req.body?.name?.trim()
+    if (!name) {
+      return validationError(res, { name: ['Le nom est requis'] })
+    }
+    const description =
+      req.body?.description !== undefined
+        ? req.body.description?.trim() || null
+        : existing.rows[0].description
+
+    const slug = await uniqueCategorySlug(query, name, id)
+    const { rows } = await query(
+      `UPDATE categories
+       SET name = $1, slug = $2, description = $3, updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [name, slug, description, id]
+    )
+    res.json({ category: formatCategory(rows[0]) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/categories/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id)
+    const existing = await query('SELECT id FROM categories WHERE id = $1', [id])
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: 'Catégorie introuvable' })
+    }
+
+    const linked = await query(
+      'SELECT COUNT(*)::int AS n FROM ebook_category WHERE category_id = $1',
+      [id]
+    )
+    if (linked.rows[0].n > 0) {
+      return res.status(422).json({
+        message: `Impossible de supprimer : ${linked.rows[0].n} ebook(s) y sont encore liés`,
+      })
+    }
+
+    await query('DELETE FROM categories WHERE id = $1', [id])
+    res.json({ message: 'Catégorie supprimée' })
   } catch (err) {
     next(err)
   }

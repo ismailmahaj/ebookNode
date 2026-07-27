@@ -6,6 +6,7 @@ export interface AdminCategory {
   slug: string
   description?: string
   image_url?: string
+  ebook_count?: number
 }
 
 export interface AdminEbook {
@@ -82,6 +83,26 @@ export async function updateUserSubscription(
 export async function getAdminCategories(): Promise<AdminCategory[]> {
   const { data } = await api.get<AdminCategory[]>('/admin/categories')
   return data
+}
+
+export async function createAdminCategory(payload: {
+  name: string
+  description?: string
+}): Promise<{ category: AdminCategory }> {
+  const { data } = await api.post<{ category: AdminCategory }>('/admin/categories', payload)
+  return data
+}
+
+export async function updateAdminCategory(
+  id: number,
+  payload: { name: string; description?: string }
+): Promise<{ category: AdminCategory }> {
+  const { data } = await api.patch<{ category: AdminCategory }>(`/admin/categories/${id}`, payload)
+  return data
+}
+
+export async function deleteAdminCategory(id: number): Promise<void> {
+  await api.delete(`/admin/categories/${id}`)
 }
 
 export async function getAdminEbooks(params?: {

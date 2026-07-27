@@ -10,6 +10,7 @@ import AdminLayout from './pages/admin/AdminLayout'
 import AdminEbookList from './pages/admin/AdminEbookList'
 import AdminEbookForm from './pages/admin/AdminEbookForm'
 import AdminUsers from './pages/admin/AdminUsers'
+import AdminCategories from './pages/admin/AdminCategories'
 import Subscription from './pages/Subscription'
 import SubscriptionSuccess from './pages/SubscriptionSuccess'
 import SubscriptionCancel from './pages/SubscriptionCancel'
@@ -109,6 +110,7 @@ function App() {
           <Route path="ebooks" element={<AdminEbookList />} />
           <Route path="ebooks/new" element={<AdminEbookForm />} />
           <Route path="ebooks/:id/edit" element={<AdminEbookForm />} />
+          <Route path="categories" element={<AdminCategories />} />
           <Route path="users" element={<AdminUsers />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
