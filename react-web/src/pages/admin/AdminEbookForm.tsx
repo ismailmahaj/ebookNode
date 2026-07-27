@@ -105,10 +105,10 @@ export default function AdminEbookForm() {
           msg = Object.entries(res.errors)
             .map(([field, list]) => `${field}: ${list.join(', ')}`)
             .join(' — ')
-          if (import.meta.env.DEV) console.error('Validation 422:', res.errors)
         } else if (res?.message) {
           msg = res.message
         }
+        console.error('Upload admin échoué:', res || err)
       }
       toast.error(msg, { duration: 6000 })
     } finally {

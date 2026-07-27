@@ -18,6 +18,24 @@ describe('fileValidation', () => {
     assert.equal(r.extension, '.pdf')
   })
 
+  it('accepte PDF/cover en application/octet-stream (quirk navigateur)', () => {
+    const pdf = validateUploadFile({
+      assetType: 'PDF',
+      originalname: 'book.pdf',
+      mimetype: 'application/octet-stream',
+      size: 1024,
+    })
+    assert.equal(pdf.contentType, 'application/pdf')
+
+    const cover = validateUploadFile({
+      assetType: 'COVER',
+      originalname: 'c.jpg',
+      mimetype: 'application/octet-stream',
+      size: 1024,
+    })
+    assert.equal(cover.contentType, 'image/jpeg')
+  })
+
   it('refuse un exécutable', () => {
     assert.throws(
       () =>

@@ -1,15 +1,18 @@
 import path from 'path'
 import { config } from '../../config.js'
 
+/** Types génériques souvent envoyés par navigateurs / OS (extension déjà vérifiée). */
+const GENERIC_MIMES = new Set(['application/octet-stream', 'binary/octet-stream', ''])
+
 const ALLOWED = {
   PDF: {
     extensions: ['.pdf'],
-    mimes: ['application/pdf'],
+    mimes: ['application/pdf', 'application/x-pdf'],
     maxMb: () => config.r2.maxPdfSizeMb,
   },
   PDF_PREVIEW: {
     extensions: ['.pdf'],
-    mimes: ['application/pdf'],
+    mimes: ['application/pdf', 'application/x-pdf'],
     maxMb: () => config.r2.maxPdfSizeMb,
   },
   EPUB: {
@@ -24,7 +27,7 @@ const ALLOWED = {
   },
   COVER: {
     extensions: ['.jpg', '.jpeg', '.png', '.webp'],
-    mimes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    mimes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/x-png'],
     maxMb: () => config.r2.maxCoverSizeMb,
   },
   AUDIO_CHAPTER: {
@@ -93,8 +96,13 @@ export function validateUploadFile({ assetType, originalname, mimetype, size }) 
     )
   }
 
-  if (!mimetype || !rules.mimes.includes(mimetype)) {
-    // EPUB: certains clients envoient octet-stream — déjà dans la liste
+  const mime = (mimetype || '').toLowerCase().trim()
+  const mimeOk =
+    rules.mimes.includes(mime) ||
+    // Après contrôle d'extension : accepter les MIME génériques (souvent PDF/images)
+    GENERIC_MIMES.has(mime)
+
+  if (!mimeOk) {
     throw new FileValidationError(
       `Type MIME non autorisé (${mimetype || 'inconnu'}) pour ${assetType}`
     )
@@ -112,10 +120,15 @@ export function validateUploadFile({ assetType, originalname, mimetype, size }) 
     throw new FileValidationError('Fichier vide')
   }
 
+  const contentType =
+    rules.mimes.includes(mime) && mime
+      ? mime
+      : rules.mimes[0]
+
   return {
     extension: normalizedExt,
     maxBytes,
-    contentType: mimetype,
+    contentType,
   }
 }
 
