@@ -130,26 +130,46 @@ async function sendPdf(res, ebook, { preferPreview = false } = {}) {
       if (typeof body.pipe === 'function') {
         body.pipe(res)
       } else {
-        // SDK v3 may return async iterable
         const chunks = []
         for await (const chunk of body) chunks.push(chunk)
         res.send(Buffer.concat(chunks))
       }
       return
     } catch (err) {
-      console.error('[R2] erreur stream PDF', { ebookId: ebook.id })
-      return res.status(503).json({ message: 'Fichier temporairement indisponible' })
+      const missing =
+        err?.name === 'NoSuchKey' ||
+        err?.$metadata?.httpStatusCode === 404 ||
+        /does not exist|NotFound|NoSuchKey/i.test(err?.message || '')
+      console.error('[R2] erreur stream PDF', {
+        ebookId: ebook.id,
+        key: objectKey,
+        missing,
+        message: err?.message,
+        name: err?.name,
+      })
+      if (!missing) {
+        return res.status(503).json({
+          message: 'Fichier temporairement indisponible. Réessayez dans un instant.',
+        })
+      }
+      // Clé absente → tenter fallback local
     }
   }
 
   // Fallback local
   if (!ebook.pdf_file_path) {
-    return res.status(404).json({ message: 'Fichier PDF non disponible' })
+    return res.status(404).json({
+      message:
+        'Fichier PDF introuvable. Ré-uploadez le PDF depuis l\'admin (stockage cloud).',
+    })
   }
 
   const resolved = path.resolve(resolveStoredPath(ebook.pdf_file_path))
   if (!fs.existsSync(resolved)) {
-    return res.status(404).json({ message: 'Fichier PDF non disponible' })
+    return res.status(404).json({
+      message:
+        'Fichier PDF introuvable. Ré-uploadez le PDF depuis l\'admin (stockage cloud).',
+    })
   }
 
   res.setHeader('Content-Type', 'application/pdf')

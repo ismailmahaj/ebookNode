@@ -94,9 +94,12 @@ AppException _mapResponseError(Response<dynamic>? response) {
 
   return switch (status) {
     401 => const SessionExpiredException(),
-    403 => const SubscriptionRequiredException(),
-    404 => const NotFoundException(),
-    >= 500 => const ServerException(),
+    403 => AppException(message),
+    404 => AppException(message),
+    503 => AppException(message),
+    >= 500 => AppException(message.isEmpty || message == 'Une erreur est survenue.'
+        ? 'Erreur serveur. Réessayez plus tard.'
+        : message),
     _ => AppException(message),
   };
 }

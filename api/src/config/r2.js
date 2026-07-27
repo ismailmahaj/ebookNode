@@ -41,6 +41,22 @@ export function getR2Client() {
       requestChecksumCalculation: 'WHEN_REQUIRED',
       responseChecksumValidation: 'WHEN_REQUIRED',
     })
+
+    // R2 ignore encore certains headers checksum sur GetObject
+    client.middlewareStack.add(
+      (next) => async (args) => {
+        const headers = args?.request?.headers
+        if (headers) {
+          for (const key of Object.keys(headers)) {
+            if (/checksum/i.test(key)) {
+              delete headers[key]
+            }
+          }
+        }
+        return next(args)
+      },
+      { step: 'build', name: 'r2StripChecksumHeaders', priority: 'high' }
+    )
   }
   return client
 }
