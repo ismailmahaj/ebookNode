@@ -82,6 +82,50 @@ class EbookRepository {
     }
   }
 
+  /// Télécharge le PDF (aperçu ou complet) avec auth Bearer.
+  Future<List<int>> fetchPdfBytes(int id, {required bool preview}) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        preview ? ApiConstants.ebookPreview(id) : ApiConstants.ebookStream(id),
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(minutes: 3),
+        ),
+      );
+      final data = response.data;
+      if (data == null || data.isEmpty) {
+        throw const AppException('PDF vide ou indisponible.');
+      }
+      return data;
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  /// Charge les octets de couverture via Dio (même base URL que l'API).
+  Future<List<int>?> fetchCoverBytes(int id) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        ApiConstants.ebookCover(id),
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s >= 200 && s < 400,
+        ),
+      );
+      final data = response.data;
+      if (data == null || data.isEmpty) return null;
+      // Si l'API renvoie du JSON d'erreur malgré le status
+      if (data.length < 200) {
+        final head = String.fromCharCodes(data.take(20));
+        if (head.contains('{') || head.contains('<!')) return null;
+      }
+      return data;
+    } on DioException {
+      return null;
+    }
+  }
+
   Future<List<Category>> getCategories() async {
     try {
       final response = await _dio.get<List<dynamic>>(ApiConstants.categories);

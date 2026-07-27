@@ -326,8 +326,11 @@ export async function softDeleteAsset(ebookId, assetId) {
 
 export async function resolveObjectKey(ebook, format, { preview = false } = {}) {
   if (preview) {
-    if (format === 'epub') return ebook.preview_epub_object_key || null
-    return ebook.preview_pdf_object_key || null
+    if (format === 'epub') {
+      return ebook.preview_epub_object_key || ebook.epub_object_key || null
+    }
+    // Aperçu dédié, sinon PDF complet (compat web/mobile)
+    return ebook.preview_pdf_object_key || ebook.pdf_object_key || null
   }
   if (format === 'epub') return ebook.epub_object_key || null
   return ebook.pdf_object_key || null

@@ -1,20 +1,18 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../shared/models/ebook.dart';
+import 'ebook_cover_image.dart';
 
 class EbookCoverCard extends StatelessWidget {
   const EbookCoverCard({
     super.key,
     required this.ebook,
-    required this.coverUrl,
     this.width = 120,
   });
 
   final Ebook ebook;
-  final String coverUrl;
   final double width;
 
   @override
@@ -25,33 +23,13 @@ class EbookCoverCard extends StatelessWidget {
         width: width,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: AspectRatio(
                 aspectRatio: 2 / 3,
-                child: coverUrl.isEmpty
-                    ? Container(
-                        color: AppColors.netflixCardBg,
-                        child: const Icon(
-                          Icons.menu_book,
-                          color: AppColors.netflixGray,
-                        ),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: coverUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: AppColors.netflixCardBg,
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: AppColors.netflixCardBg,
-                          child: const Icon(
-                            Icons.broken_image,
-                            color: AppColors.netflixGray,
-                          ),
-                        ),
-                      ),
+                child: EbookCoverImage(ebookId: ebook.id),
               ),
             ),
             const SizedBox(height: 8),

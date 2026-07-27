@@ -9,6 +9,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state.dart';
 import '../../../shared/models/ebook.dart';
 import '../../../shared/widgets/ebook_cover_card.dart';
+import '../../../shared/widgets/ebook_cover_image.dart';
 import '../data/ebook_repository.dart';
 
 class HomePage extends ConsumerWidget {
@@ -17,7 +18,6 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ebooksAsync = ref.watch(ebooksProvider);
-    final repo = ref.watch(ebookRepositoryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.netflixBlack,
@@ -77,25 +77,18 @@ class HomePage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: _HeroSection(
-                      ebook: hero,
-                      coverUrl: repo.resolveMediaUrl(hero.coverImageUrl),
-                    ),
-                  ),
+                  SliverToBoxAdapter(child: _HeroSection(ebook: hero)),
                   if (featured.length > 1)
                     SliverToBoxAdapter(
                       child: _CarouselSection(
                         title: 'À ne pas manquer',
                         ebooks: featured,
-                        resolveCover: repo.resolveMediaUrl,
                       ),
                     ),
                   SliverToBoxAdapter(
                     child: _CarouselSection(
                       title: 'Ajouts récents',
                       ebooks: ebooks,
-                      resolveCover: repo.resolveMediaUrl,
                     ),
                   ),
                   ...byCategory.entries.map(
@@ -103,7 +96,6 @@ class HomePage extends ConsumerWidget {
                       child: _CarouselSection(
                         title: entry.key,
                         ebooks: entry.value,
-                        resolveCover: repo.resolveMediaUrl,
                       ),
                     ),
                   ),
@@ -132,10 +124,9 @@ class HomePage extends ConsumerWidget {
 }
 
 class _HeroSection extends StatelessWidget {
-  const _HeroSection({required this.ebook, required this.coverUrl});
+  const _HeroSection({required this.ebook});
 
   final Ebook ebook;
-  final String coverUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -143,47 +134,54 @@ class _HeroSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: GestureDetector(
         onTap: () => context.push('/ebook/${ebook.id}'),
-        child: Container(
-          height: 220,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: AppColors.netflixCardBg,
-            image: coverUrl.isNotEmpty
-                ? DecorationImage(
-                    image: NetworkImage(coverUrl),
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withValues(alpha: 0.45),
-                      BlendMode.darken,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            height: 220,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                EbookCoverImage(ebookId: ebook.id, fit: BoxFit.cover),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.85),
+                      ],
                     ),
-                    onError: (_, __) {},
-                  )
-                : null,
-          ),
-          padding: const EdgeInsets.all(20),
-          alignment: Alignment.bottomLeft,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                ebook.title,
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${ebook.author} · ${ebook.totalPages} pages',
-                style: const TextStyle(color: AppColors.netflixWhite),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () => context.push('/ebook/${ebook.id}'),
-                icon: const Icon(Icons.menu_book, size: 18),
-                label: const Text('Voir le détail'),
-              ),
-            ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ebook.title,
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              color: Colors.white,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${ebook.author} · ${ebook.totalPages} pages',
+                        style: const TextStyle(color: AppColors.netflixWhite),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () => context.push('/ebook/${ebook.id}'),
+                        icon: const Icon(Icons.menu_book, size: 18),
+                        label: const Text('Voir le détail'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -195,12 +193,10 @@ class _CarouselSection extends StatelessWidget {
   const _CarouselSection({
     required this.title,
     required this.ebooks,
-    required this.resolveCover,
   });
 
   final String title;
   final List<Ebook> ebooks;
-  final String Function(String?) resolveCover;
 
   @override
   Widget build(BuildContext context) {
@@ -225,13 +221,7 @@ class _CarouselSection extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: ebooks.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) {
-              final ebook = ebooks[i];
-              return EbookCoverCard(
-                ebook: ebook,
-                coverUrl: resolveCover(ebook.coverImageUrl),
-              );
-            },
+            itemBuilder: (_, i) => EbookCoverCard(ebook: ebooks[i]),
           ),
         ),
       ],

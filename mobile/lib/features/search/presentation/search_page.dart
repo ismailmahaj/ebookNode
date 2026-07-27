@@ -53,7 +53,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   Widget build(BuildContext context) {
     final query = ref.watch(searchQueryProvider);
     final resultsAsync = ref.watch(searchResultsProvider);
-    final repo = ref.watch(ebookRepositoryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.netflixBlack,
@@ -122,8 +121,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                             final ebook = ebooks[i];
                             return EbookCoverCard(
                               ebook: ebook,
-                              coverUrl:
-                                  repo.resolveMediaUrl(ebook.coverImageUrl),
                               width: double.infinity,
                             );
                           },

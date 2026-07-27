@@ -15,7 +15,6 @@ class DiscoveryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ebooksAsync = ref.watch(ebooksProvider);
-    final repo = ref.watch(ebookRepositoryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.netflixBlack,
@@ -58,10 +57,8 @@ class DiscoveryPage extends ConsumerWidget {
                     ),
                     itemCount: ebooks.length,
                     itemBuilder: (_, i) {
-                      final ebook = ebooks[i];
                       return EbookCoverCard(
-                        ebook: ebook,
-                        coverUrl: repo.resolveMediaUrl(ebook.coverImageUrl),
+                        ebook: ebooks[i],
                         width: double.infinity,
                       );
                     },

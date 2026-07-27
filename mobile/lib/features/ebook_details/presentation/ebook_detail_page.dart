@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/error_state.dart';
+import '../../../shared/widgets/ebook_cover_image.dart';
 import '../../authentication/data/auth_repository.dart';
 import '../../home/data/ebook_repository.dart';
 
@@ -18,7 +18,6 @@ class EbookDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ebookAsync = ref.watch(ebookDetailProvider(id));
-    final repo = ref.watch(ebookRepositoryProvider);
     final user = ref.watch(authStateProvider).valueOrNull?.user;
     final hasSubscription =
         user?.isAdmin == true || user?.hasActiveSubscription == true;
@@ -36,8 +35,6 @@ class EbookDetailPage extends ConsumerWidget {
           onRetry: () => ref.invalidate(ebookDetailProvider(id)),
         ),
         data: (ebook) {
-          final coverUrl = repo.resolveMediaUrl(ebook.coverImageUrl);
-
           return CustomScrollView(
             slivers: [
               SliverAppBar(
@@ -62,12 +59,7 @@ class EbookDetailPage extends ConsumerWidget {
                             width: 180,
                             child: AspectRatio(
                               aspectRatio: 2 / 3,
-                              child: coverUrl.isEmpty
-                                  ? Container(color: AppColors.netflixCardBg)
-                                  : CachedNetworkImage(
-                                      imageUrl: coverUrl,
-                                      fit: BoxFit.cover,
-                                    ),
+                              child: EbookCoverImage(ebookId: ebook.id),
                             ),
                           ),
                         ),

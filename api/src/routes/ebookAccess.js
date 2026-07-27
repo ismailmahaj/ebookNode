@@ -31,27 +31,38 @@ async function loadEbook(id, { activeOnly = true } = {}) {
  */
 router.get('/:id/cover', async (req, res, next) => {
   try {
-    // Admin peut prévisualiser des ebooks inactifs
     const ebook = await loadEbook(req.params.id, { activeOnly: false })
     if (!ebook) return res.status(404).json({ message: 'Ebook introuvable' })
 
     res.setHeader('Cache-Control', 'public, max-age=3600')
 
     if (ebook.cover_object_key && isR2Configured()) {
-      const { body, contentType, contentLength } = await getObjectStream(
-        ebook.cover_object_key
-      )
-      res.setHeader('Content-Type', contentType || 'image/jpeg')
-      if (contentLength != null) res.setHeader('Content-Length', String(contentLength))
+      try {
+        const { body, contentType, contentLength } = await getObjectStream(
+          ebook.cover_object_key
+        )
+        res.setHeader('Content-Type', contentType || 'image/jpeg')
+        if (contentLength != null) res.setHeader('Content-Length', String(contentLength))
 
-      if (body && typeof body.pipe === 'function') {
-        return body.pipe(res)
+        if (body && typeof body.pipe === 'function') {
+          return body.pipe(res)
+        }
+        if (body?.transformToByteArray) {
+          const bytes = await body.transformToByteArray()
+          return res.send(Buffer.from(bytes))
+        }
+      } catch (err) {
+        const missing =
+          err?.name === 'NoSuchKey' ||
+          err?.$metadata?.httpStatusCode === 404 ||
+          /does not exist|NotFound|NoSuchKey/i.test(err?.message || '')
+        if (!missing) {
+          console.error('[cover] R2 error', { id: ebook.id, message: err?.message })
+          return res.status(503).json({ message: 'Couverture temporairement indisponible' })
+        }
+        console.warn('[cover] clé R2 absente', { id: ebook.id, key: ebook.cover_object_key })
+        // tombe sur fallback local si présent
       }
-      if (body?.transformToByteArray) {
-        const bytes = await body.transformToByteArray()
-        return res.send(Buffer.from(bytes))
-      }
-      return res.status(500).json({ message: 'Impossible de lire la couverture R2' })
     }
 
     if (ebook.cover_image_path) {
@@ -63,11 +74,6 @@ router.get('/:id/cover', async (req, res, next) => {
       const existing = candidates.find((p) => fs.existsSync(p))
       if (existing) {
         return res.sendFile(existing)
-      }
-
-      // Ancienne URL relative servie en static
-      if (ebook.cover_image_path.startsWith('/uploads/')) {
-        return res.redirect(302, `${config.appUrl}${ebook.cover_image_path}`)
       }
     }
 

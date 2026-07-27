@@ -8,6 +8,7 @@ abstract final class ApiConstants {
   static String ebook(int id) => '/ebooks/$id';
   static String ebookPreview(int id) => '/ebooks/$id/preview';
   static String ebookStream(int id) => '/ebooks/$id/stream';
+  static String ebookCover(int id) => '/ebooks/$id/cover';
 
   static const categories = '/categories';
 
