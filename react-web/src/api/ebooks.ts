@@ -2,29 +2,29 @@ import { api } from './client'
 
 /**
  * URL d'affichage pour la couverture d'un ebook.
- * En mode proxy (sans VITE_API_URL), on utilise l'origine courante pour que l'image passe par le proxy.
+ * Préfixe toujours avec VITE_API_URL (prod) ou l'origine (dev proxy).
  */
 export function getCoverImageUrl(coverImageUrl: string | null | undefined): string {
   if (!coverImageUrl) return ''
 
-  // URL absolue renvoyée par l'API (ex. http://localhost:8000/uploads/...)
+  const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : ''
+
+  // URL absolue (anciennes réponses API avec APP_URL)
   if (coverImageUrl.startsWith('http')) {
-    if (import.meta.env.VITE_API_URL) return coverImageUrl
-    if (typeof window !== 'undefined') {
-      try {
-        const u = new URL(coverImageUrl)
-        return window.location.origin + u.pathname
-      } catch {
-        return coverImageUrl
-      }
+    try {
+      const u = new URL(coverImageUrl)
+      // Toujours réécrire le host vers l'API réelle (APP_URL localhost en prod)
+      if (apiBase) return `${apiBase}${u.pathname}${u.search}`
+      return `${origin}${u.pathname}${u.search}`
+    } catch {
+      return coverImageUrl
     }
-    return coverImageUrl
   }
 
-  // Chemin relatif /uploads/...
-  const base = import.meta.env.VITE_API_URL
-    || (typeof window !== 'undefined' ? window.location.origin : '')
-  return `${base.replace(/\/$/, '')}${coverImageUrl.startsWith('/') ? coverImageUrl : `/${coverImageUrl}`}`
+  const path = coverImageUrl.startsWith('/') ? coverImageUrl : `/${coverImageUrl}`
+  return `${(apiBase || origin).replace(/\/$/, '')}${path}`
 }
 
 export interface Category {

@@ -179,7 +179,7 @@ router.get('/:id/cover-url', authenticate, async (req, res, next) => {
 
     return res.json({
       data: {
-        url: `${config.appUrl}/api/ebooks/${ebook.id}/cover`,
+        url: `/api/ebooks/${ebook.id}/cover`,
         expiresIn: null,
         ebookId: ebook.id,
         type: 'cover',

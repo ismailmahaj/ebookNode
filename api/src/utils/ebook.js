@@ -23,11 +23,11 @@ export function formatEbook(row, categories = []) {
   const hasR2Cover = Boolean(row.cover_object_key)
   const hasLocalCover = Boolean(coverPath)
 
-  // URL stable pour <img> (Bearer token impossible sur src d'image).
-  // L'endpoint /cover sert le fichier local ou un stream R2.
+  // Chemin relatif : le front/mobile préfixe avec la bonne base API
+  // (évite APP_URL=localhost en prod qui casse les <img>).
   let coverImageUrl = null
   if (hasR2Cover || hasLocalCover) {
-    coverImageUrl = `${config.appUrl}/api/ebooks/${row.id}/cover`
+    coverImageUrl = `/api/ebooks/${row.id}/cover`
   }
 
   return {
