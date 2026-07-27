@@ -7,6 +7,8 @@ import { paginate, paginatedResponse, parseBool } from '../utils/pagination.js'
 import { formatEbook, loadCategoriesForEbooks } from '../utils/ebook.js'
 import { hasActiveSubscription } from '../utils/user.js'
 import { uploadsPath } from '../middleware/upload.js'
+import { isR2Configured } from '../config/r2.js'
+import { getObjectStream } from '../services/storage/r2StorageService.js'
 
 const router = Router()
 
@@ -108,13 +110,44 @@ router.get('/:id', authenticate, async (req, res, next) => {
 })
 
 function resolveStoredPath(storedPath) {
+  if (!storedPath) return null
   const relative = storedPath.replace(/^\/uploads\//, '')
   return path.join(uploadsPath, relative)
 }
 
-function sendPdf(res, ebook) {
-  const resolved = path.resolve(resolveStoredPath(ebook.pdf_file_path))
+async function sendPdf(res, ebook, { preferPreview = false } = {}) {
+  // R2 prioritaire
+  const objectKey = preferPreview
+    ? ebook.preview_pdf_object_key || ebook.pdf_object_key
+    : ebook.pdf_object_key
 
+  if (objectKey && isR2Configured()) {
+    try {
+      const { body, contentType, contentLength } = await getObjectStream(objectKey)
+      res.setHeader('Content-Type', contentType || 'application/pdf')
+      res.setHeader('Content-Disposition', `inline; filename="${ebook.slug || 'book'}.pdf"`)
+      if (contentLength) res.setHeader('Content-Length', contentLength)
+      if (typeof body.pipe === 'function') {
+        body.pipe(res)
+      } else {
+        // SDK v3 may return async iterable
+        const chunks = []
+        for await (const chunk of body) chunks.push(chunk)
+        res.send(Buffer.concat(chunks))
+      }
+      return
+    } catch (err) {
+      console.error('[R2] erreur stream PDF', { ebookId: ebook.id })
+      return res.status(503).json({ message: 'Fichier temporairement indisponible' })
+    }
+  }
+
+  // Fallback local
+  if (!ebook.pdf_file_path) {
+    return res.status(404).json({ message: 'Fichier PDF non disponible' })
+  }
+
+  const resolved = path.resolve(resolveStoredPath(ebook.pdf_file_path))
   if (!fs.existsSync(resolved)) {
     return res.status(404).json({ message: 'Fichier PDF non disponible' })
   }
@@ -131,7 +164,8 @@ router.get('/:id/preview', authenticate, async (req, res, next) => {
       [req.params.id]
     )
     if (!rows.length) return res.status(404).json({ message: 'Ebook introuvable' })
-    sendPdf(res, rows[0])
+    // Prefer preview object if present; else legacy full PDF (compat)
+    await sendPdf(res, rows[0], { preferPreview: true })
   } catch (err) {
     next(err)
   }
@@ -150,7 +184,7 @@ router.get('/:id/stream', authenticate, async (req, res, next) => {
     if (!rows.length) return res.status(404).json({ message: 'Ebook introuvable' })
 
     await query('UPDATE ebooks SET total_views = total_views + 1 WHERE id = $1', [req.params.id])
-    sendPdf(res, rows[0])
+    await sendPdf(res, rows[0], { preferPreview: false })
   } catch (err) {
     next(err)
   }

@@ -4,7 +4,10 @@ import path from 'path'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 import { query } from '../db/pool.js'
 import { authenticate, requireAdmin } from '../middleware/auth.js'
-import { uploadEbookFiles, uploadsPath } from '../middleware/upload.js'
+import { uploadEbookFiles, uploadsPath, isR2Configured } from '../middleware/upload.js'
+import { uploadEbookAsset } from '../services/ebookAssetService.js'
+import { deleteEbookR2Objects } from './adminAssets.js'
+import { assetTypeFromField } from '../services/storage/fileValidation.js'
 import { paginate, paginatedResponse, parseBool } from '../utils/pagination.js'
 import {
   formatCategory,
@@ -76,11 +79,19 @@ async function getEbookWithCategories(id) {
   return formatEbook(rows[0], catMap.get(id) || [])
 }
 
+async function countPdfPagesFromBuffer(buffer) {
+  try {
+    const data = await pdf(buffer)
+    return data.numpages || 0
+  } catch {
+    return 0
+  }
+}
+
 async function countPdfPages(filePath) {
   try {
     const buffer = fs.readFileSync(filePath)
-    const data = await pdf(buffer)
-    return data.numpages || 0
+    return countPdfPagesFromBuffer(buffer)
   } catch {
     return 0
   }
@@ -96,7 +107,7 @@ function resolveStoredPath(storedPath) {
 }
 
 function removeFile(storedPath) {
-  if (!storedPath) return
+  if (!storedPath || storedPath.startsWith('r2:')) return
   const full = resolveStoredPath(storedPath)
   if (fs.existsSync(full)) fs.unlinkSync(full)
 }
@@ -161,7 +172,7 @@ router.get('/ebooks/:id', async (req, res, next) => {
 router.post('/ebooks', (req, res, next) => {
   uploadEbookFiles(req, res, async (err) => {
     if (err) {
-      return res.status(422).json({ message: err.message })
+      return res.status(err.status || 422).json({ message: err.message })
     }
 
     try {
@@ -181,20 +192,29 @@ router.post('/ebooks', (req, res, next) => {
       if (!coverFile) errors.cover_image = ['L\'image de couverture est requise']
 
       if (Object.keys(errors).length) {
-        if (pdfFile) removeFile(publicPath('pdfs', pdfFile.filename))
-        if (coverFile) removeFile(publicPath('covers', coverFile.filename))
+        if (!isR2Configured()) {
+          if (pdfFile?.filename) removeFile(publicPath('pdfs', pdfFile.filename))
+          if (coverFile?.filename) removeFile(publicPath('covers', coverFile.filename))
+        }
         return validationError(res, errors)
       }
 
       const slug = await uniqueSlug(query, body.title.trim())
-      const totalPages = await countPdfPages(pdfFile.path)
+      const useR2 = isR2Configured() && pdfFile.buffer
+
+      let totalPages = 0
+      if (useR2) {
+        totalPages = await countPdfPagesFromBuffer(pdfFile.buffer)
+      } else {
+        totalPages = await countPdfPages(pdfFile.path)
+      }
 
       const { rows } = await query(
         `INSERT INTO ebooks (
           title, slug, author, description, isbn,
           cover_image_path, pdf_file_path, pdf_file_size, total_pages,
-          preview_pages, published_at, is_featured, is_active
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          preview_pages, published_at, is_featured, is_active, storage_provider
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
         RETURNING *`,
         [
           body.title.trim(),
@@ -202,19 +222,58 @@ router.post('/ebooks', (req, res, next) => {
           body.author.trim(),
           body.description.trim(),
           body.isbn?.trim() || null,
-          publicPath('covers', coverFile.filename),
-          publicPath('pdfs', pdfFile.filename),
+          useR2 ? null : publicPath('covers', coverFile.filename),
+          useR2 ? null : publicPath('pdfs', pdfFile.filename),
           pdfFile.size,
           totalPages,
           parseInt(body.preview_pages, 10) || 10,
           body.published_at || null,
           parseBool(body.is_featured) ?? false,
           parseBool(body.is_active) ?? true,
+          useR2 ? 'cloudflare-r2' : 'local',
         ]
       )
 
-      await syncCategories(rows[0].id, categoryIds)
-      const ebook = await getEbookWithCategories(rows[0].id)
+      const ebookId = rows[0].id
+
+      if (useR2) {
+        await uploadEbookAsset({
+          ebookId,
+          assetType: 'PDF',
+          buffer: pdfFile.buffer,
+          originalname: pdfFile.originalname,
+          mimetype: pdfFile.mimetype,
+          size: pdfFile.size,
+          uploadedBy: req.user.id,
+        })
+        await uploadEbookAsset({
+          ebookId,
+          assetType: 'COVER',
+          buffer: coverFile.buffer,
+          originalname: coverFile.originalname,
+          mimetype: coverFile.mimetype,
+          size: coverFile.size,
+          uploadedBy: req.user.id,
+        })
+
+        // Optional extra fields
+        for (const field of ['epub_file', 'preview_pdf', 'preview_epub', 'audio_file', 'audio_preview']) {
+          const f = req.files?.[field]?.[0]
+          if (!f?.buffer) continue
+          await uploadEbookAsset({
+            ebookId,
+            assetType: assetTypeFromField(field),
+            buffer: f.buffer,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+            size: f.size,
+            uploadedBy: req.user.id,
+          })
+        }
+      }
+
+      await syncCategories(ebookId, categoryIds)
+      const ebook = await getEbookWithCategories(ebookId)
       res.status(201).json({ ebook })
     } catch (e) {
       next(e)
@@ -225,7 +284,7 @@ router.post('/ebooks', (req, res, next) => {
 router.post('/ebooks/:id', (req, res, next) => {
   uploadEbookFiles(req, res, async (err) => {
     if (err) {
-      return res.status(422).json({ message: err.message })
+      return res.status(err.status || 422).json({ message: err.message })
     }
 
     try {
@@ -252,22 +311,61 @@ router.post('/ebooks/:id', (req, res, next) => {
 
       const pdfFile = req.files?.pdf_file?.[0]
       const coverFile = req.files?.cover_image?.[0]
+      const useR2 = isR2Configured()
 
       let coverPath = current.cover_image_path
       let pdfPath = current.pdf_file_path
       let pdfSize = current.pdf_file_size
       let totalPages = current.total_pages
 
-      if (coverFile) {
-        removeFile(current.cover_image_path)
-        coverPath = publicPath('covers', coverFile.filename)
-      }
-
-      if (pdfFile) {
+      if (useR2 && pdfFile?.buffer) {
+        totalPages = await countPdfPagesFromBuffer(pdfFile.buffer)
+        pdfSize = pdfFile.size
+        await uploadEbookAsset({
+          ebookId: Number(ebookId),
+          assetType: 'PDF',
+          buffer: pdfFile.buffer,
+          originalname: pdfFile.originalname,
+          mimetype: pdfFile.mimetype,
+          size: pdfFile.size,
+          uploadedBy: req.user.id,
+        })
+      } else if (pdfFile?.filename) {
         removeFile(current.pdf_file_path)
         pdfPath = publicPath('pdfs', pdfFile.filename)
         pdfSize = pdfFile.size
         totalPages = await countPdfPages(pdfFile.path)
+      }
+
+      if (useR2 && coverFile?.buffer) {
+        await uploadEbookAsset({
+          ebookId: Number(ebookId),
+          assetType: 'COVER',
+          buffer: coverFile.buffer,
+          originalname: coverFile.originalname,
+          mimetype: coverFile.mimetype,
+          size: coverFile.size,
+          uploadedBy: req.user.id,
+        })
+      } else if (coverFile?.filename) {
+        removeFile(current.cover_image_path)
+        coverPath = publicPath('covers', coverFile.filename)
+      }
+
+      if (useR2) {
+        for (const field of ['epub_file', 'preview_pdf', 'preview_epub', 'audio_file', 'audio_preview']) {
+          const f = req.files?.[field]?.[0]
+          if (!f?.buffer) continue
+          await uploadEbookAsset({
+            ebookId: Number(ebookId),
+            assetType: assetTypeFromField(field),
+            buffer: f.buffer,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+            size: f.size,
+            uploadedBy: req.user.id,
+          })
+        }
       }
 
       const slug = body.title.trim() !== current.title
@@ -317,6 +415,7 @@ router.delete('/ebooks/:id', async (req, res, next) => {
     const ebook = rows[0]
     removeFile(ebook.cover_image_path)
     removeFile(ebook.pdf_file_path)
+    await deleteEbookR2Objects(ebook.id)
     await query('DELETE FROM ebooks WHERE id = $1', [req.params.id])
     res.json({ message: 'Ebook supprimé' })
   } catch (err) {

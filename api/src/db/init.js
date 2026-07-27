@@ -77,11 +77,49 @@ CREATE TABLE IF NOT EXISTS billing_events (
 );
 `
 
+const r2StorageMigrations = `
+ALTER TABLE ebooks ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(50) DEFAULT 'local';
+ALTER TABLE ebooks ADD COLUMN IF NOT EXISTS pdf_object_key VARCHAR(500);
+ALTER TABLE ebooks ADD COLUMN IF NOT EXISTS cover_object_key VARCHAR(500);
+ALTER TABLE ebooks ADD COLUMN IF NOT EXISTS preview_pdf_object_key VARCHAR(500);
+ALTER TABLE ebooks ADD COLUMN IF NOT EXISTS epub_object_key VARCHAR(500);
+ALTER TABLE ebooks ADD COLUMN IF NOT EXISTS preview_epub_object_key VARCHAR(500);
+
+-- Chemins locaux optionnels quand storage = cloudflare-r2
+ALTER TABLE ebooks ALTER COLUMN cover_image_path DROP NOT NULL;
+ALTER TABLE ebooks ALTER COLUMN pdf_file_path DROP NOT NULL;
+
+CREATE TABLE IF NOT EXISTS ebook_assets (
+  id SERIAL PRIMARY KEY,
+  ebook_id INTEGER NOT NULL REFERENCES ebooks(id) ON DELETE CASCADE,
+  type VARCHAR(50) NOT NULL,
+  object_key VARCHAR(500) NOT NULL,
+  original_filename VARCHAR(500),
+  mime_type VARCHAR(100),
+  size_bytes BIGINT DEFAULT 0,
+  checksum VARCHAR(128),
+  storage_provider VARCHAR(50) NOT NULL DEFAULT 'cloudflare-r2',
+  status VARCHAR(50) NOT NULL DEFAULT 'READY',
+  is_preview BOOLEAN NOT NULL DEFAULT FALSE,
+  chapter_number INTEGER,
+  duration_seconds INTEGER,
+  metadata JSONB,
+  uploaded_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ebook_assets_ebook_id ON ebook_assets(ebook_id);
+CREATE INDEX IF NOT EXISTS idx_ebook_assets_type ON ebook_assets(type);
+CREATE INDEX IF NOT EXISTS idx_ebook_assets_status ON ebook_assets(status);
+`
+
 export async function runMigrations(client) {
   await client.query('BEGIN')
   try {
     await client.query(migrations)
     await client.query(subscriptionMigrations)
+    await client.query(r2StorageMigrations)
     await client.query('COMMIT')
   } catch (err) {
     await client.query('ROLLBACK')

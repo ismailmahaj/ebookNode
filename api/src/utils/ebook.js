@@ -19,6 +19,16 @@ export function formatCategory(row) {
 }
 
 export function formatEbook(row, categories = []) {
+  const coverPath = row.cover_image_path || null
+  let coverImageUrl = null
+  if (coverPath) {
+    coverImageUrl = coverPath.startsWith('/')
+      ? coverPath
+      : coverPath.startsWith('http')
+        ? coverPath
+        : fileUrl(coverPath)
+  }
+
   return {
     id: row.id,
     title: row.title,
@@ -26,11 +36,9 @@ export function formatEbook(row, categories = []) {
     author: row.author,
     description: row.description,
     isbn: row.isbn || undefined,
-    cover_image_url: row.cover_image_path.startsWith('/')
-      ? row.cover_image_path
-      : fileUrl(row.cover_image_path),
-    pdf_file_path: row.pdf_file_path,
-    pdf_file_size: Number(row.pdf_file_size),
+    cover_image_url: coverImageUrl,
+    // Ne plus exposer le chemin PDF brut (sécurité)
+    pdf_file_size: Number(row.pdf_file_size || 0),
     total_pages: row.total_pages,
     preview_pages: row.preview_pages,
     published_at: row.published_at
@@ -38,6 +46,11 @@ export function formatEbook(row, categories = []) {
       : null,
     is_featured: row.is_featured,
     is_active: row.is_active,
+    storage_provider: row.storage_provider || 'local',
+    has_pdf: Boolean(row.pdf_object_key || row.pdf_file_path),
+    has_epub: Boolean(row.epub_object_key),
+    has_preview: Boolean(row.preview_pdf_object_key || row.preview_epub_object_key),
+    has_cover: Boolean(row.cover_object_key || coverPath),
     categories,
     ...(row.total_views !== undefined ? { total_views: row.total_views } : {}),
   }
