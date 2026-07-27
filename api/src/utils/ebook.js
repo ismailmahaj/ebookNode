@@ -19,14 +19,15 @@ export function formatCategory(row) {
 }
 
 export function formatEbook(row, categories = []) {
-  const coverPath = row.cover_image_path || null
+  const coverPath = (row.cover_image_path || '').trim() || null
+  const hasR2Cover = Boolean(row.cover_object_key)
+  const hasLocalCover = Boolean(coverPath)
+
+  // URL stable pour <img> (Bearer token impossible sur src d'image).
+  // L'endpoint /cover sert le fichier local ou un stream R2.
   let coverImageUrl = null
-  if (coverPath) {
-    coverImageUrl = coverPath.startsWith('/')
-      ? coverPath
-      : coverPath.startsWith('http')
-        ? coverPath
-        : fileUrl(coverPath)
+  if (hasR2Cover || hasLocalCover) {
+    coverImageUrl = `${config.appUrl}/api/ebooks/${row.id}/cover`
   }
 
   return {
@@ -50,7 +51,7 @@ export function formatEbook(row, categories = []) {
     has_pdf: Boolean(row.pdf_object_key || row.pdf_file_path),
     has_epub: Boolean(row.epub_object_key),
     has_preview: Boolean(row.preview_pdf_object_key || row.preview_epub_object_key),
-    has_cover: Boolean(row.cover_object_key || coverPath),
+    has_cover: hasR2Cover || hasLocalCover,
     categories,
     ...(row.total_views !== undefined ? { total_views: row.total_views } : {}),
   }

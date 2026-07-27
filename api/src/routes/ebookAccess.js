@@ -1,4 +1,7 @@
 import { Router } from 'express'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import { query } from '../db/pool.js'
 import { authenticate } from '../middleware/auth.js'
 import { hasActiveSubscription } from '../utils/user.js'
@@ -7,18 +10,72 @@ import {
   createAccessUrl,
   getAsset,
 } from '../services/ebookAssetService.js'
-import { getSignedDownloadUrl } from '../services/storage/r2StorageService.js'
+import { getSignedDownloadUrl, getObjectStream } from '../services/storage/r2StorageService.js'
 import { config } from '../config.js'
 
 const router = Router()
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const uploadsRoot = path.join(__dirname, '../../uploads')
 
-async function loadEbook(id) {
-  const { rows } = await query(
-    'SELECT * FROM ebooks WHERE id = $1 AND is_active = TRUE',
-    [id]
-  )
+async function loadEbook(id, { activeOnly = true } = {}) {
+  const sql = activeOnly
+    ? 'SELECT * FROM ebooks WHERE id = $1 AND is_active = TRUE'
+    : 'SELECT * FROM ebooks WHERE id = $1'
+  const { rows } = await query(sql, [id])
   return rows[0] || null
 }
+
+/**
+ * GET /api/ebooks/:id/cover
+ * Public — couverture seule (pas le PDF). Stable pour <img src>.
+ */
+router.get('/:id/cover', async (req, res, next) => {
+  try {
+    // Admin peut prévisualiser des ebooks inactifs
+    const ebook = await loadEbook(req.params.id, { activeOnly: false })
+    if (!ebook) return res.status(404).json({ message: 'Ebook introuvable' })
+
+    res.setHeader('Cache-Control', 'public, max-age=3600')
+
+    if (ebook.cover_object_key && isR2Configured()) {
+      const { body, contentType, contentLength } = await getObjectStream(
+        ebook.cover_object_key
+      )
+      res.setHeader('Content-Type', contentType || 'image/jpeg')
+      if (contentLength != null) res.setHeader('Content-Length', String(contentLength))
+
+      if (body && typeof body.pipe === 'function') {
+        return body.pipe(res)
+      }
+      if (body?.transformToByteArray) {
+        const bytes = await body.transformToByteArray()
+        return res.send(Buffer.from(bytes))
+      }
+      return res.status(500).json({ message: 'Impossible de lire la couverture R2' })
+    }
+
+    if (ebook.cover_image_path) {
+      const candidates = [
+        path.join(__dirname, '../..', ebook.cover_image_path.replace(/^\//, '')),
+        path.join(uploadsRoot, 'covers', path.basename(ebook.cover_image_path)),
+      ]
+
+      const existing = candidates.find((p) => fs.existsSync(p))
+      if (existing) {
+        return res.sendFile(existing)
+      }
+
+      // Ancienne URL relative servie en static
+      if (ebook.cover_image_path.startsWith('/uploads/')) {
+        return res.redirect(302, `${config.appUrl}${ebook.cover_image_path}`)
+      }
+    }
+
+    return res.status(404).json({ message: 'Couverture introuvable' })
+  } catch (err) {
+    next(err)
+  }
+})
 
 /**
  * GET /api/ebooks/:id/read-url?format=pdf|epub
@@ -107,7 +164,7 @@ router.get('/:id/preview-url', authenticate, async (req, res, next) => {
  */
 router.get('/:id/cover-url', authenticate, async (req, res, next) => {
   try {
-    const ebook = await loadEbook(req.params.id)
+    const ebook = await loadEbook(req.params.id, { activeOnly: false })
     if (!ebook) return res.status(404).json({ message: 'Ebook introuvable' })
 
     if (ebook.cover_object_key && isR2Configured()) {
@@ -120,17 +177,14 @@ router.get('/:id/cover-url', authenticate, async (req, res, next) => {
       })
     }
 
-    // Fallback local
-    if (ebook.cover_image_path) {
-      const url = ebook.cover_image_path.startsWith('http')
-        ? ebook.cover_image_path
-        : `${config.appUrl}${ebook.cover_image_path}`
-      return res.json({
-        data: { url, expiresIn: null, ebookId: ebook.id, type: 'cover' },
-      })
-    }
-
-    return res.status(404).json({ message: 'Couverture introuvable' })
+    return res.json({
+      data: {
+        url: `${config.appUrl}/api/ebooks/${ebook.id}/cover`,
+        expiresIn: null,
+        ebookId: ebook.id,
+        type: 'cover',
+      },
+    })
   } catch (err) {
     next(err)
   }
